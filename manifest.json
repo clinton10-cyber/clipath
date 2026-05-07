@@ -1,0 +1,25 @@
+{
+  "name": "ClipPath Maker",
+  "short_name": "ClipPath",
+  "description": "Professional CSS clip-path editor. Create, edit and copy polygon clip-paths visually.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d0f14",
+  "theme_color": "#00e5ff",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["design", "utilities", "productivity"]
+}

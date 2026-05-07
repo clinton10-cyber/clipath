@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#00e5ff"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="ClipPath"/>
+<title>ClipPath Maker</title>
+<link rel="manifest" href="./manifest.json"/>
+<link rel="apple-touch-icon" href="./icon-192.svg"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #0d0f14;
+    --panel:     #131720;
+    --border:    #1e2535;
+    --border2:   #2a3450;
+    --text:      #c8d8e8;
+    --muted:     #4a5a7a;
+    --cyan:      #00e5ff;
+    --cyan2:     #00b8cc;
+    --red:       #ff4d6d;
+    --green:     #39ff7e;
+    --amber:     #ffb300;
+    --handle-r:  7;
+    --toolbar-h: 52px;
+    --status-h:  36px;
+    --panel-w:   270px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ─── TITLE BAR ─── */
+  #titlebar {
+    display: flex; align-items: center; gap: 10px;
+    height: var(--toolbar-h); min-height: var(--toolbar-h);
+    background: #090b10;
+    border-bottom: 1px solid var(--border);
+    padding: 0 14px;
+    position: relative;
+    z-index: 50;
+  }
+  #titlebar .logo {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px; font-weight: 700;
+    color: var(--cyan); letter-spacing: 2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #titlebar .logo svg { width:22px; height:22px; }
+  #titlebar .sep { width:1px; height:26px; background:var(--border2); margin: 0 6px; }
+
+  /* toolbar buttons */
+  .tbtn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; padding: 4px 8px; border-radius: 4px;
+    border: 1px solid transparent; background: transparent;
+    color: var(--muted); cursor: pointer; font-size: 9px;
+    font-family: 'Space Mono', monospace; transition: all .15s;
+    min-width: 40px;
+  }
+  .tbtn svg { width:16px; height:16px; }
+  .tbtn:hover { background: var(--border); color: var(--text); border-color: var(--border2); }
+  .tbtn.active { background: #0a2030; color: var(--cyan); border-color: var(--cyan2); }
+  .tbtn.danger:hover { color: var(--red); border-color: var(--red); }
+
+  #tbtn-spacer { flex: 1; }
+
+  /* install button */
+  #install-btn {
+    display: none; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 4px;
+    background: linear-gradient(135deg, #003344, #005566);
+    border: 1px solid var(--cyan2); color: var(--cyan);
+    cursor: pointer; font-family: 'Space Mono', monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    animation: pulse-border 2s ease-in-out infinite;
+  }
+  #install-btn.show { display: flex; }
+  @keyframes pulse-border {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,229,255,.3); }
+    50% { box-shadow: 0 0 0 5px rgba(0,229,255,0); }
+  }
+
+  /* ─── BODY LAYOUT ─── */
+  #workspace {
+    flex: 1; display: flex; overflow: hidden;
+  }
+
+  /* ─── LEFT PANEL – Tools ─── */
+  #toolpanel {
+    width: 52px; min-width: 52px;
+    background: #090b10;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0; gap: 4px;
+  }
+  .tool {
+    width: 38px; height: 38px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid transparent; background: transparent;
+    color: var(--muted); cursor: pointer; position: relative;
+    transition: all .15s;
+  }
+  .tool svg { width:18px; height:18px; }
+  .tool:hover { background: var(--border); color: var(--text); }
+  .tool.active { background: #0a2535; color: var(--cyan); border-color: var(--cyan2); }
+  .tool-tip {
+    position: absolute; left: 48px; top: 50%; transform: translateY(-50%);
+    background: #1a2535; border: 1px solid var(--border2); color: var(--text);
+    padding: 3px 8px; border-radius: 3px; white-space: nowrap;
+    font-size: 10px; pointer-events: none; opacity: 0;
+    transition: opacity .1s; z-index: 200;
+  }
+  .tool:hover .tool-tip { opacity: 1; }
+  .tool-sep { width: 30px; height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* ─── CANVAS AREA ─── */
+  #canvas-wrap {
+    flex: 1; display: flex; flex-direction: column;
+    background: #0a0d12;
+    position: relative; overflow: hidden;
+  }
+
+  /* rulers */
+  #ruler-corner { width: 20px; height: 20px; background: #090b10; border-right:1px solid var(--border); border-bottom:1px solid var(--border); flex-shrink:0; }
+  #ruler-h-wrap { display:flex; }
+  #ruler-h { flex:1; height:20px; background: #090b10; border-bottom:1px solid var(--border); overflow:hidden; position:relative; }
+  #ruler-v { width:20px; background: #090b10; border-right:1px solid var(--border); overflow:hidden; position:relative; }
+  #canvas-main { flex:1; display:flex; }
+  canvas#ruler-hc { display:block; }
+  canvas#ruler-vc { display:block; }
+
+  #stage {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; position: relative; cursor: crosshair;
+  }
+  #stage.tool-select { cursor: default; }
+  #stage.tool-addpt { cursor: cell; }
+
+  /* grid bg */
+  #stage::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: .35;
+  }
+
+  /* The editor SVG overlay */
+  #editor-root {
+    position: relative;
+    box-shadow: 0 0 0 1px var(--border2), 0 8px 60px rgba(0,0,0,.7);
+  }
+  #preview-img {
+    display: block;
+    pointer-events: none;
+  }
+  #svg-overlay {
+    position: absolute; inset: 0;
+    overflow: visible;
+  }
+
+  /* ─── RIGHT PANEL ─── */
+  #rightpanel {
+    width: var(--panel-w); min-width: var(--panel-w);
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow-y: auto; overflow-x: hidden;
+  }
+  .rpanel-section {
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+  }
+  .rpanel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 14px;
+    font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 1.5px; color: var(--muted);
+    cursor: pointer; background: #0f1319;
+    border-bottom: 1px solid var(--border);
+  }
+  .rpanel-head.open { color: var(--cyan); }
+  .rpanel-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .rpanel-body.hidden { display: none; }
+
+  label.field-label {
+    display: block; font-size: 10px; color: var(--muted);
+    margin-bottom: 4px; letter-spacing: .5px;
+  }
+  input[type=range] {
+    width: 100%; accent-color: var(--cyan);
+    height: 3px; cursor: pointer;
+  }
+  input[type=number], input[type=text] {
+    background: var(--bg); border: 1px solid var(--border2);
+    color: var(--text); font-family: 'Space Mono', monospace;
+    font-size: 11px; padding: 5px 8px; border-radius: 3px;
+    width: 100%; outline: none;
+  }
+  input[type=number]:focus, input[type=text]:focus {
+    border-color: var(--cyan);
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+
+  /* preset buttons */
+  .preset-btn {
+    display: flex; align-items: center; justify-content: center;
+    padding: 8px 4px; border-radius: 4px; border: 1px solid var(--border2);
+    background: var(--bg); color: var(--muted); cursor: pointer;
+    font-size: 9px; text-align: center; transition: all .15s;
+    flex-direction: column; gap: 4px;
+  }
+  .preset-btn svg { width: 22px; height: 22px; }
+  .preset-btn:hover { border-color: var(--cyan); color: var(--cyan); background: #0a2535; }
+
+  /* point list */
+  #points-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+  .point-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px; border-radius: 3px; border: 1px solid var(--border);
+    background: var(--bg); cursor: pointer; transition: all .1s;
+    font-size: 10px;
+  }
+  .point-item.selected { border-color: var(--cyan); background: #0a2535; color: var(--cyan); }
+  .point-item .pi-idx { color: var(--muted); font-size: 9px; min-width: 16px; }
+  .point-item .pi-coords { flex: 1; }
+  .point-item .pi-del {
+    color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1;
+    padding: 0 2px;
+  }
+  .point-item .pi-del:hover { color: var(--red); }
+
+  /* CSS output */
+  #css-out {
+    background: var(--bg); border: 1px solid var(--border2);
+    border-radius: 4px; padding: 10px; font-size: 10px; line-height: 1.7;
+    color: var(--green); word-break: break-all; min-height: 60px;
+    font-family: 'Space Mono', monospace; white-space: pre-wrap;
+  }
+  .copy-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px; border-radius: 4px; border: 1px solid var(--cyan2);
+    background: #0a2535; color: var(--cyan); cursor: pointer;
+    font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 1px; transition: all .15s; width: 100%;
+  }
+  .copy-btn:hover { background: #0d3040; }
+  .copy-btn.copied { border-color: var(--green); color: var(--green); background: #001a0a; }
+
+  /* upload zone */
+  #upload-zone {
+    border: 2px dashed var(--border2); border-radius: 6px;
+    padding: 18px; text-align: center; cursor: pointer;
+    color: var(--muted); transition: all .2s;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  #upload-zone:hover, #upload-zone.drag { border-color: var(--cyan); color: var(--cyan); background: #0a1820; }
+  #upload-zone svg { width: 28px; height: 28px; }
+  #upload-zone span { font-size: 10px; }
+  #file-input { display: none; }
+
+  /* color picker row */
+  .color-row { display: flex; align-items: center; gap: 8px; }
+  .color-swatch {
+    width: 28px; height: 28px; border-radius: 4px;
+    border: 1px solid var(--border2); cursor: pointer; flex-shrink: 0;
+  }
+  input[type=color] { opacity: 0; position: absolute; width: 1px; height: 1px; }
+
+  /* ─── STATUS BAR ─── */
+  #statusbar {
+    height: var(--status-h); min-height: var(--status-h);
+    background: #090b10; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0;
+    font-size: 10px; color: var(--muted);
+    padding: 0 14px; z-index: 50;
+  }
+  .sb-item { display: flex; align-items: center; gap: 5px; padding: 0 14px; border-right: 1px solid var(--border); }
+  .sb-item:first-child { padding-left: 0; }
+  .sb-val { color: var(--text); }
+  .sb-cyan { color: var(--cyan); }
+  #sb-spacer { flex: 1; }
+
+  /* ─── INSTALL BANNER ─── */
+  #install-banner {
+    display: none; position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(135deg, #0a1825, #0d2535);
+    border: 1px solid var(--cyan); border-radius: 10px;
+    padding: 16px 22px; z-index: 1000;
+    box-shadow: 0 8px 40px rgba(0,229,255,.2);
+    max-width: 340px; width: 90%; text-align: center;
+    animation: slideUp .3s ease;
+  }
+  #install-banner.show { display: block; }
+  @keyframes slideUp { from { transform: translateX(-50%) translateY(20px); opacity:0; } to { transform: translateX(-50%) translateY(0); opacity:1; } }
+  #install-banner h3 { font-family: 'Rajdhani', sans-serif; font-size: 16px; color: var(--cyan); margin-bottom: 6px; }
+  #install-banner p { font-size: 11px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
+  #install-banner .ib-btns { display: flex; gap: 10px; }
+  #install-banner .ib-ok { flex:1; padding: 9px; border-radius: 5px; background: var(--cyan); color: var(--bg); border: none; cursor: pointer; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 14px; }
+  #install-banner .ib-no { flex:1; padding: 9px; border-radius: 5px; background: transparent; color: var(--muted); border: 1px solid var(--border2); cursor: pointer; font-size: 11px; font-family: 'Space Mono', monospace; }
+
+  /* handles */
+  .handle {
+    cursor: grab; transition: r .1s;
+  }
+  .handle:active { cursor: grabbing; }
+  .handle.selected-h { stroke: var(--amber) !important; fill: var(--amber) !important; }
+
+  /* ─── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* mobile stack */
+  @media (max-width: 640px) {
+    #toolpanel { display: none; }
+    #rightpanel { width: 220px; min-width: 220px; }
+    :root { --panel-w: 220px; }
+  }
+  @media (max-width: 500px) {
+    #rightpanel { display: none; }
+    #stage { flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ TITLE BAR ═══════════════ -->
+<div id="titlebar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+      <polygon points="3,21 3,8 12,3 21,8 21,17 15,21"/>
+      <circle cx="3" cy="21" r="1.5" fill="currentColor"/>
+      <circle cx="3" cy="8" r="1.5" fill="currentColor"/>
+      <circle cx="12" cy="3" r="1.5" fill="currentColor"/>
+      <circle cx="21" cy="8" r="1.5" fill="currentColor"/>
+      <circle cx="21" cy="17" r="1.5" fill="currentColor"/>
+      <circle cx="15" cy="21" r="1.5" fill="#ff4d6d" stroke="none"/>
+    </svg>
+    CLIPPATH MAKER
+  </div>
+  <div class="sep"></div>
+
+  <button class="tbtn active" id="tool-select-btn" onclick="setTool('select')" title="Select">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M3 2L3 13L7 10L9 14L10.5 13.3L8.5 9.3L12 9.3Z" fill="currentColor" stroke="none"/>
+    </svg>
+    SELECT
+  </button>
+  <button class="tbtn" id="tool-addpt-btn" onclick="setTool('addpt')" title="Add Point (click edge)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/>
+      <circle cx="8" cy="8" r="3" stroke-dasharray="2 2"/>
+    </svg>
+    ADD PT
+  </button>
+
+  <div class="sep"></div>
+
+  <button class="tbtn danger" onclick="resetPoints()" title="Reset shape">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M3 8A5 5 0 1 1 8 13" stroke-linecap="round"/>
+      <path d="M3 5V8H6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    RESET
+  </button>
+
+  <div id="tbtn-spacer"></div>
+
+  <button id="install-btn" onclick="triggerInstall()">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M8 2v8M5 7l3 4 3-4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M2 12h12v2H2z" fill="currentColor" stroke="none"/>
+    </svg>
+    INSTALL APP
+  </button>
+</div>
+
+<!-- ═══════════════ WORKSPACE ═══════════════ -->
+<div id="workspace">
+
+  <!-- LEFT TOOL PANEL -->
+  <div id="toolpanel">
+    <div class="tool active" id="tl-select" onclick="setTool('select')" title="">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M4 3L4 17L9 12L11 17L13 16L11 11L16 11Z" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="tool-tip">Select/Move</span>
+    </div>
+    <div class="tool" id="tl-addpt" onclick="setTool('addpt')">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="10" y1="3" x2="10" y2="17"/><line x1="3" y1="10" x2="17" y2="10"/>
+        <circle cx="10" cy="10" r="4" stroke-dasharray="3 2"/>
+      </svg>
+      <span class="tool-tip">Add Point</span>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool" onclick="zoomStage(1.2)">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="9" cy="9" r="5"/><line x1="13" y1="13" x2="17" y2="17"/>
+        <line x1="9" y1="6" x2="9" y2="12"/><line x1="6" y1="9" x2="12" y2="9"/>
+      </svg>
+      <span class="tool-tip">Zoom In</span>
+    </div>
+    <div class="tool" onclick="zoomStage(0.8)">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="9" cy="9" r="5"/><line x1="13" y1="13" x2="17" y2="17"/>
+        <line x1="6" y1="9" x2="12" y2="9"/>
+      </svg>
+      <span class="tool-tip">Zoom Out</span>
+    </div>
+    <div class="tool" onclick="zoomStage(1, true)">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="4" y="4" width="12" height="12" rx="1"/>
+        <path d="M8 4v3M12 4v3M4 8h3M4 12h3" stroke-linecap="round"/>
+      </svg>
+      <span class="tool-tip">Fit to Stage</span>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-wrap">
+    <div id="stage">
+      <div id="editor-root">
+        <div id="preview-img" style="position:relative; overflow:hidden;">
+          <div id="clip-target" style="width:100%;height:100%;"></div>
+        </div>
+        <svg id="svg-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="rightpanel">
+
+    <!-- Image Upload -->
+    <div class="rpanel-section">
+      <div class="rpanel-head open" onclick="toggleSection(this)">IMAGE <span>▾</span></div>
+      <div class="rpanel-body">
+        <div id="upload-zone" onclick="document.getElementById('file-input').click()"
+             ondragover="e=>{e.preventDefault();this.classList.add('drag')}"
+             ondragleave="this.classList.remove('drag')"
+             ondrop="handleDrop(event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <path d="M21 15l-5-5L5 21"/>
+          </svg>
+          <span>Click or drop image</span>
+          <span style="font-size:9px; color:var(--border2)">PNG, JPG, SVG, WebP</span>
+        </div>
+        <input type="file" id="file-input" accept="image/*" onchange="loadImage(this)"/>
+        <div class="row2">
+          <div>
+            <label class="field-label">WIDTH (px)</label>
+            <input type="number" id="can-w" value="400" min="50" max="1200" onchange="resizeCanvas()"/>
+          </div>
+          <div>
+            <label class="field-label">HEIGHT (px)</label>
+            <input type="number" id="can-h" value="300" min="50" max="1200" onchange="resizeCanvas()"/>
+          </div>
+        </div>
+        <!-- fill color -->
+        <div>
+          <label class="field-label">FILL COLOR (no image)</label>
+          <div class="color-row">
+            <div class="color-swatch" id="fill-swatch" style="background:#2a4080" onclick="document.getElementById('fill-color').click()"></div>
+            <input type="color" id="fill-color" value="#2a4080" oninput="updateFill()"/>
+            <input type="text" id="fill-text" value="#2a4080" oninput="setFillText(this.value)" style="flex:1"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preset Shapes -->
+    <div class="rpanel-section">
+      <div class="rpanel-head open" onclick="toggleSection(this)">PRESETS <span>▾</span></div>
+      <div class="rpanel-body">
+        <div class="row3">
+          <button class="preset-btn" onclick="applyPreset('rect')" title="Rectangle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="1"/></svg>
+            RECT
+          </button>
+          <button class="preset-btn" onclick="applyPreset('diamond')" title="Diamond">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,3 21,12 12,21 3,12"/></svg>
+            DIAMOND
+          </button>
+          <button class="preset-btn" onclick="applyPreset('triangle')" title="Triangle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,3 22,21 2,21"/></svg>
+            TRI
+          </button>
+          <button class="preset-btn" onclick="applyPreset('pentagon')" title="Pentagon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 22,9 18,21 6,21 2,9"/></svg>
+            PENTA
+          </button>
+          <button class="preset-btn" onclick="applyPreset('hexagon')" title="Hexagon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 21,7 21,17 12,22 3,17 3,7"/></svg>
+            HEX
+          </button>
+          <button class="preset-btn" onclick="applyPreset('arrow')" title="Arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="2,8 16,8 16,4 22,12 16,20 16,16 2,16"/></svg>
+            ARROW
+          </button>
+          <button class="preset-btn" onclick="applyPreset('notch-rect')" title="Notched corners">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="6,3 18,3 21,6 21,18 18,21 6,21 3,18 3,6"/></svg>
+            NOTCH
+          </button>
+          <button class="preset-btn" onclick="applyPreset('chevron')" title="Chevron">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="2,5 20,5 22,12 20,19 2,19 4,12"/></svg>
+            CHEV
+          </button>
+          <button class="preset-btn" onclick="applyPreset('star')" title="Star">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9"/></svg>
+            STAR
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Points -->
+    <div class="rpanel-section">
+      <div class="rpanel-head open" onclick="toggleSection(this)">POINTS <span id="pt-count">0</span> <span>▾</span></div>
+      <div class="rpanel-body">
+        <div id="points-list"></div>
+        <div id="selected-point-edit" style="display:none;">
+          <div class="row2" style="margin-top:8px;">
+            <div>
+              <label class="field-label">X (%)</label>
+              <input type="number" id="pt-x" min="0" max="100" step="0.1" onchange="updateSelectedPoint()"/>
+            </div>
+            <div>
+              <label class="field-label">Y (%)</label>
+              <input type="number" id="pt-y" min="0" max="100" step="0.1" onchange="updateSelectedPoint()"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CSS Output -->
+    <div class="rpanel-section">
+      <div class="rpanel-head open" onclick="toggleSection(this)">CSS OUTPUT <span>▾</span></div>
+      <div class="rpanel-body">
+        <div id="css-out"></div>
+        <button class="copy-btn" id="copy-btn" onclick="copyCSS()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="5" y="5" width="9" height="9" rx="1"/>
+            <path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/>
+          </svg>
+          COPY CSS
+        </button>
+
+        <!-- Also output inline style -->
+        <label class="field-label" style="margin-top:8px;">INLINE STYLE</label>
+        <div id="inline-out" style="background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:8px;font-size:9px;color:#7fbbff;word-break:break-all;line-height:1.7;font-family:'Space Mono',monospace;"></div>
+        <button class="copy-btn" onclick="copyInline()" style="margin-top:6px;border-color:var(--border2);color:var(--muted);">
+          COPY INLINE STYLE
+        </button>
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="rpanel-section">
+      <div class="rpanel-head open" onclick="toggleSection(this)">OPTIONS <span>▾</span></div>
+      <div class="rpanel-body">
+        <label class="field-label">HANDLE SIZE</label>
+        <input type="range" id="handle-size" min="4" max="14" value="7" oninput="setHandleSize(this.value)"/>
+
+        <label class="field-label" style="margin-top:6px;">SHOW FILL OVERLAY</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="range" id="overlay-opacity" min="0" max="100" value="40" oninput="setOverlayOpacity(this.value)"/>
+          <span id="ov-val" style="min-width:28px;text-align:right;">40%</span>
+        </div>
+
+        <label class="field-label" style="margin-top:6px;">UNIT</label>
+        <div class="row2">
+          <button class="preset-btn" id="unit-pct" onclick="setUnit('percent')" style="border-color:var(--cyan);color:var(--cyan);">%</button>
+          <button class="preset-btn" id="unit-px" onclick="setUnit('px')">px</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════ STATUS BAR ═══════════════ -->
+<div id="statusbar">
+  <div class="sb-item">
+    <span>TOOL:</span><span class="sb-val sb-cyan" id="sb-tool">SELECT</span>
+  </div>
+  <div class="sb-item">
+    <span>PTS:</span><span class="sb-val" id="sb-pts">0</span>
+  </div>
+  <div class="sb-item">
+    <span>CURSOR:</span><span class="sb-val" id="sb-cursor">—</span>
+  </div>
+  <div class="sb-item">
+    <span>CANVAS:</span><span class="sb-val" id="sb-size">400 × 300</span>
+  </div>
+  <div id="sb-spacer"></div>
+  <div class="sb-item" style="border-right:none;">
+    <span class="sb-val" id="sb-zoom">100%</span>
+  </div>
+</div>
+
+<!-- ═══════════════ INSTALL BANNER ═══════════════ -->
+<div id="install-banner">
+  <h3>📐 Install ClipPath Maker</h3>
+  <p>Add to your home screen for offline use — works like a native design app, no internet required.</p>
+  <div class="ib-btns">
+    <button class="ib-ok" onclick="triggerInstall()">Install Now</button>
+    <button class="ib-no" onclick="dismissBanner()">Maybe Later</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let points = []; // [{x,y}] as percentages 0-100
+let selectedIdx = -1;
+let tool = 'select';
+let dragging = false;
+let dragIdx = -1;
+let dragOff = {x:0, y:0};
+let canW = 400, canH = 300;
+let zoom = 1;
+let hasImage = false;
+let handleSize = 7;
+let overlayOpacity = 0.4;
+let unit = 'percent';
+let installPromptEvent = null;
+
+const stage      = document.getElementById('stage');
+const editorRoot = document.getElementById('editor-root');
+const previewImg = document.getElementById('preview-img');
+const clipTarget = document.getElementById('clip-target');
+const svgOvl     = document.getElementById('svg-overlay');
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+function init() {
+  resizeCanvas();
+  applyPreset('rect');
+  setupSVGEvents();
+  render();
+}
+
+function resizeCanvas() {
+  canW = parseInt(document.getElementById('can-w').value) || 400;
+  canH = parseInt(document.getElementById('can-h').value) || 300;
+  editorRoot.style.width  = canW + 'px';
+  editorRoot.style.height = canH + 'px';
+  previewImg.style.width  = canW + 'px';
+  previewImg.style.height = canH + 'px';
+  svgOvl.setAttribute('viewBox', `0 0 ${canW} ${canH}`);
+  svgOvl.style.width  = canW + 'px';
+  svgOvl.style.height = canH + 'px';
+  document.getElementById('sb-size').textContent = `${canW} × ${canH}`;
+  render();
+}
+
+// ═══════════════════════════════════════════════════
+//  PRESET SHAPES
+// ═══════════════════════════════════════════════════
+const PRESETS = {
+  rect:      [[0,0],[100,0],[100,100],[0,100]],
+  diamond:   [[50,0],[100,50],[50,100],[0,50]],
+  triangle:  [[50,0],[100,100],[0,100]],
+  pentagon:  [[50,0],[100,38],[81,100],[19,100],[0,38]],
+  hexagon:   [[50,0],[100,25],[100,75],[50,100],[0,75],[0,25]],
+  arrow:     [[0,30],[70,30],[70,0],[100,50],[70,100],[70,70],[0,70]],
+  'notch-rect': [[10,0],[90,0],[100,10],[100,90],[90,100],[10,100],[0,90],[0,10]],
+  chevron:   [[0,0],[85,0],[100,50],[85,100],[0,100],[15,50]],
+  star: (function(){
+    const pts=[];
+    for(let i=0;i<10;i++){
+      const a = (i*36-90)*Math.PI/180;
+      const r = i%2===0 ? 50 : 20;
+      pts.push([50+r*Math.cos(a), 50+r*Math.sin(a)]);
+    }
+    return pts;
+  })()
+};
+
+function applyPreset(name) {
+  const raw = PRESETS[name];
+  if(!raw) return;
+  points = raw.map(([x,y]) => ({x, y}));
+  selectedIdx = -1;
+  render();
+}
+
+function resetPoints() { applyPreset('rect'); }
+
+// ═══════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════
+function render() {
+  renderClipPath();
+  renderSVG();
+  renderCSSOut();
+  renderPointList();
+}
+
+function renderClipPath() {
+  if(points.length < 3) return;
+  const poly = points.map(p => `${p.x.toFixed(2)}% ${p.y.toFixed(2)}%`).join(', ');
+  const css = `polygon(${poly})`;
+  clipTarget.style.clipPath = css;
+  clipTarget.style.webkitClipPath = css;
+}
+
+function renderSVG() {
+  svgOvl.innerHTML = '';
+  if(points.length < 2) return;
+  const W = canW, H = canH;
+
+  // px positions
+  const pts = points.map(p => ({px: p.x/100*W, py: p.y/100*H}));
+
+  // filled overlay
+  const polyPts = pts.map(p => `${p.px},${p.py}`).join(' ');
+  const polyEl = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  polyEl.setAttribute('points', polyPts);
+  polyEl.setAttribute('fill', `rgba(0,229,255,${overlayOpacity})`);
+  polyEl.setAttribute('stroke', '#00e5ff');
+  polyEl.setAttribute('stroke-width', '1.5');
+  polyEl.setAttribute('stroke-linejoin', 'round');
+  svgOvl.appendChild(polyEl);
+
+  // edges (clickable for add-point)
+  pts.forEach((p, i) => {
+    const next = pts[(i+1) % pts.length];
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', p.px); line.setAttribute('y1', p.py);
+    line.setAttribute('x2', next.px); line.setAttribute('y2', next.py);
+    line.setAttribute('stroke', 'transparent');
+    line.setAttribute('stroke-width', '12');
+    line.dataset.edgeIdx = i;
+    line.style.cursor = tool === 'addpt' ? 'cell' : 'default';
+    line.addEventListener('click', onEdgeClick);
+    svgOvl.appendChild(line);
+  });
+
+  // handles
+  pts.forEach((p, i) => {
+    const r = handleSize;
+    const outer = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    outer.setAttribute('cx', p.px); outer.setAttribute('cy', p.py);
+    outer.setAttribute('r', r + 3);
+    outer.setAttribute('fill', 'transparent');
+    outer.setAttribute('stroke', i === selectedIdx ? '#ffb300' : '#00e5ff');
+    outer.setAttribute('stroke-width', '1');
+    svgOvl.appendChild(outer);
+
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx', p.px); c.setAttribute('cy', p.py);
+    c.setAttribute('r', r);
+    c.setAttribute('fill', i === selectedIdx ? '#ffb300' : '#00e5ff');
+    c.setAttribute('stroke', '#0d0f14');
+    c.setAttribute('stroke-width', '1.5');
+    c.classList.add('handle');
+    c.dataset.idx = i;
+    c.addEventListener('mousedown', onHandleMouseDown);
+    c.addEventListener('touchstart', onHandleTouchStart, {passive: false});
+    c.addEventListener('contextmenu', e => { e.preventDefault(); deletePoint(i); });
+    svgOvl.appendChild(c);
+
+    // index label
+    const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x', p.px + r + 4);
+    txt.setAttribute('y', p.py - r - 2);
+    txt.setAttribute('fill', i === selectedIdx ? '#ffb300' : '#00e5ff');
+    txt.setAttribute('font-size', '9');
+    txt.setAttribute('font-family', 'Space Mono, monospace');
+    txt.textContent = i;
+    svgOvl.appendChild(txt);
+  });
+}
+
+function renderCSSOut() {
+  const poly = buildPolygon();
+  const css = `clip-path: polygon(\n  ${poly}\n);`;
+  const inline = `style="clip-path: polygon(${poly.replace(/\n\s*/g,' ')})"`;
+  document.getElementById('css-out').textContent = css;
+  document.getElementById('inline-out').textContent = inline;
+}
+
+function buildPolygon() {
+  if(unit === 'percent') {
+    return points.map(p => `${p.x.toFixed(2)}% ${p.y.toFixed(2)}%`).join(',\n  ');
+  } else {
+    return points.map(p => `${Math.round(p.x/100*canW)}px ${Math.round(p.y/100*canH)}px`).join(',\n  ');
+  }
+}
+
+function renderPointList() {
+  const list = document.getElementById('points-list');
+  list.innerHTML = '';
+  document.getElementById('pt-count').textContent = points.length;
+  document.getElementById('sb-pts').textContent = points.length;
+
+  points.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'point-item' + (i === selectedIdx ? ' selected' : '');
+    div.innerHTML = `
+      <span class="pi-idx">${i}</span>
+      <span class="pi-coords">${p.x.toFixed(1)}%, ${p.y.toFixed(1)}%</span>
+      <span class="pi-del" onclick="deletePoint(${i})">×</span>
+    `;
+    div.addEventListener('click', () => selectPoint(i));
+    list.appendChild(div);
+  });
+
+  const edit = document.getElementById('selected-point-edit');
+  if(selectedIdx >= 0 && selectedIdx < points.length) {
+    edit.style.display = 'block';
+    document.getElementById('pt-x').value = points[selectedIdx].x.toFixed(2);
+    document.getElementById('pt-y').value = points[selectedIdx].y.toFixed(2);
+  } else {
+    edit.style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  INTERACTION
+// ═══════════════════════════════════════════════════
+function setupSVGEvents() {
+  svgOvl.addEventListener('mousemove', onMouseMove);
+  svgOvl.addEventListener('mouseup', onMouseUp);
+  document.addEventListener('mouseup', onMouseUp);
+  svgOvl.addEventListener('touchmove', onTouchMove, {passive: false});
+  svgOvl.addEventListener('touchend', onMouseUp);
+  svgOvl.addEventListener('mouseleave', () => {
+    document.getElementById('sb-cursor').textContent = '—';
+  });
+}
+
+function svgCoords(e) {
+  const rect = svgOvl.getBoundingClientRect();
+  const scaleX = canW / rect.width;
+  const scaleY = canH / rect.height;
+  let cx, cy;
+  if(e.touches) {
+    cx = (e.touches[0].clientX - rect.left) * scaleX;
+    cy = (e.touches[0].clientY - rect.top)  * scaleY;
+  } else {
+    cx = (e.clientX - rect.left) * scaleX;
+    cy = (e.clientY - rect.top)  * scaleY;
+  }
+  return {
+    x: Math.max(0, Math.min(100, cx/canW*100)),
+    y: Math.max(0, Math.min(100, cy/canH*100)),
+    px: cx, py: cy
+  };
+}
+
+function onHandleMouseDown(e) {
+  if(tool !== 'select') return;
+  e.preventDefault();
+  dragIdx = parseInt(this.dataset.idx);
+  dragging = true;
+  selectPoint(dragIdx);
+}
+
+function onHandleTouchStart(e) {
+  if(tool !== 'select') return;
+  e.preventDefault();
+  dragIdx = parseInt(this.dataset.idx);
+  dragging = true;
+  selectPoint(dragIdx);
+}
+
+function onMouseMove(e) {
+  const c = svgCoords(e);
+  document.getElementById('sb-cursor').textContent = `${c.x.toFixed(1)}%, ${c.y.toFixed(1)}%`;
+  if(dragging && dragIdx >= 0) {
+    points[dragIdx] = {x: c.x, y: c.y};
+    render();
+  }
+}
+
+function onTouchMove(e) {
+  e.preventDefault();
+  onMouseMove(e);
+}
+
+function onMouseUp() {
+  dragging = false;
+  dragIdx = -1;
+}
+
+function onEdgeClick(e) {
+  if(tool !== 'addpt') return;
+  e.stopPropagation();
+  const edgeIdx = parseInt(this.dataset.edgeIdx);
+  const c = svgCoords(e);
+  // insert after edgeIdx
+  points.splice(edgeIdx + 1, 0, {x: c.x, y: c.y});
+  selectPoint(edgeIdx + 1);
+  render();
+}
+
+// stage click — add point if in addpt mode (fallback)
+stage.addEventListener('click', function(e) {
+  if(tool !== 'addpt' || e.target !== svgOvl) return;
+  const c = svgCoords(e);
+  points.push({x: c.x, y: c.y});
+  selectPoint(points.length - 1);
+  render();
+});
+
+function selectPoint(i) {
+  selectedIdx = i;
+  render();
+}
+
+function deletePoint(i) {
+  if(points.length <= 3) { alert('Minimum 3 points required.'); return; }
+  points.splice(i, 1);
+  if(selectedIdx >= points.length) selectedIdx = points.length - 1;
+  render();
+}
+
+function updateSelectedPoint() {
+  if(selectedIdx < 0) return;
+  points[selectedIdx] = {
+    x: parseFloat(document.getElementById('pt-x').value) || 0,
+    y: parseFloat(document.getElementById('pt-y').value) || 0
+  };
+  render();
+}
+
+// ═══════════════════════════════════════════════════
+//  TOOL
+// ═══════════════════════════════════════════════════
+function setTool(t) {
+  tool = t;
+  document.getElementById('tl-select').classList.toggle('active', t==='select');
+  document.getElementById('tl-addpt').classList.toggle('active', t==='addpt');
+  document.getElementById('tool-select-btn').classList.toggle('active', t==='select');
+  document.getElementById('tool-addpt-btn').classList.toggle('active', t==='addpt');
+  stage.className = 'tool-' + t;
+  document.getElementById('sb-tool').textContent = t.toUpperCase();
+  renderSVG();
+}
+
+// ═══════════════════════════════════════════════════
+//  IMAGE
+// ═══════════════════════════════════════════════════
+function loadImage(input) {
+  const file = input.files[0];
+  if(!file) return;
+  readImageFile(file);
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith('image/')) readImageFile(file);
+}
+
+function readImageFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    clipTarget.style.background = `url("${ev.target.result}") center/cover no-repeat`;
+    clipTarget.style.backgroundColor = '';
+    hasImage = true;
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateFill() {
+  const v = document.getElementById('fill-color').value;
+  document.getElementById('fill-text').value = v;
+  document.getElementById('fill-swatch').style.background = v;
+  if(!hasImage) clipTarget.style.background = v;
+}
+
+function setFillText(v) {
+  if(/^#[0-9a-f]{6}$/i.test(v)) {
+    document.getElementById('fill-color').value = v;
+    document.getElementById('fill-swatch').style.background = v;
+    if(!hasImage) clipTarget.style.background = v;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  COPY
+// ═══════════════════════════════════════════════════
+function copyCSS() {
+  const text = document.getElementById('css-out').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✓ COPIED!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'COPY CSS'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copyInline() {
+  const text = document.getElementById('inline-out').textContent;
+  navigator.clipboard.writeText(text);
+}
+
+// ═══════════════════════════════════════════════════
+//  OPTIONS
+// ═══════════════════════════════════════════════════
+function setHandleSize(v) {
+  handleSize = parseInt(v);
+  renderSVG();
+}
+
+function setOverlayOpacity(v) {
+  overlayOpacity = parseInt(v)/100;
+  document.getElementById('ov-val').textContent = v + '%';
+  renderSVG();
+}
+
+function setUnit(u) {
+  unit = u;
+  document.getElementById('unit-pct').style.borderColor = u==='percent' ? 'var(--cyan)' : 'var(--border2)';
+  document.getElementById('unit-pct').style.color = u==='percent' ? 'var(--cyan)' : 'var(--muted)';
+  document.getElementById('unit-px').style.borderColor = u==='px' ? 'var(--cyan)' : 'var(--border2)';
+  document.getElementById('unit-px').style.color = u==='px' ? 'var(--cyan)' : 'var(--muted)';
+  renderCSSOut();
+}
+
+function zoomStage(factor, fit) {
+  if(fit) {
+    zoom = 1;
+  } else {
+    zoom = Math.max(0.25, Math.min(4, zoom * factor));
+  }
+  editorRoot.style.transform = `scale(${zoom})`;
+  document.getElementById('sb-zoom').textContent = Math.round(zoom*100) + '%';
+}
+
+function toggleSection(head) {
+  const body = head.nextElementSibling;
+  body.classList.toggle('hidden');
+  head.classList.toggle('open', !body.classList.contains('hidden'));
+}
+
+// ═══════════════════════════════════════════════════
+//  PWA
+// ═══════════════════════════════════════════════════
+if('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      console.log('[SW] Registered', reg.scope);
+    }).catch(err => console.warn('[SW] Error', err));
+  });
+}
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installPromptEvent = e;
+  document.getElementById('install-btn').classList.add('show');
+  // Show banner after 3s if not dismissed
+  setTimeout(() => {
+    if(installPromptEvent) showInstallBanner();
+  }, 3000);
+});
+
+window.addEventListener('appinstalled', () => {
+  installPromptEvent = null;
+  document.getElementById('install-btn').classList.remove('show');
+  dismissBanner();
+});
+
+function showInstallBanner() {
+  document.getElementById('install-banner').classList.add('show');
+}
+
+function dismissBanner() {
+  document.getElementById('install-banner').classList.remove('show');
+}
+
+async function triggerInstall() {
+  dismissBanner();
+  if(!installPromptEvent) return;
+  installPromptEvent.prompt();
+  const { outcome } = await installPromptEvent.userChoice;
+  if(outcome === 'accepted') installPromptEvent = null;
+}
+
+// ═══════════════════════════════════════════════════
+//  KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT') return;
+  if(e.key === 'v' || e.key === 'Escape') setTool('select');
+  if(e.key === 'a') setTool('addpt');
+  if(e.key === 'Delete' || e.key === 'Backspace') {
+    if(selectedIdx >= 0) deletePoint(selectedIdx);
+  }
+  if(e.key === 'c' && e.ctrlKey) copyCSS();
+  if(e.key === '+' || e.key === '=') zoomStage(1.25);
+  if(e.key === '-') zoomStage(0.8);
+  if(e.key === '0') zoomStage(1, true);
+  // arrow nudge
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key) && selectedIdx >= 0) {
+    e.preventDefault();
+    const step = e.shiftKey ? 5 : 0.5;
+    const p = points[selectedIdx];
+    if(e.key === 'ArrowLeft')  p.x = Math.max(0, p.x - step);
+    if(e.key === 'ArrowRight') p.x = Math.min(100, p.x + step);
+    if(e.key === 'ArrowUp')    p.y = Math.max(0, p.y - step);
+    if(e.key === 'ArrowDown')  p.y = Math.min(100, p.y + step);
+    render();
+  }
+});
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  // default fill
+  clipTarget.style.background = 'linear-gradient(135deg, #1a3a6a 0%, #2a6080 50%, #0d3050 100%)';
+  init();
+});
+</script>
+</body>
+</html>
